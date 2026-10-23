@@ -5,6 +5,8 @@ import os
 def generate_market_data(output_path="data.sql"):
     random.seed(42)
     sql = []
+    sql.append("USE market_db;")
+    sql.append("GO\n")
     sql.append("-- ========================================================================================")
     sql.append("-- ไฟล์: data.sql (ชุดข้อมูลจำลอง Mock Data สำหรับระบบการจองและเช่าพื้นที่ตลาดนัด - หัวข้อ 27)")
     sql.append("-- DBMS: Microsoft SQL Server (T-SQL) | อ้างอิงตาม Schema v0.1")
@@ -132,7 +134,7 @@ def generate_market_data(output_path="data.sql"):
     mday_id = 1
 
     sql.append("-- ========================================================================================")
-    sql.append("-- 4. ตาราง market_days (45 แถว: เปิด 42 วัน, ปิดปรับปรุง 3 วัน)")
+    sql.append("-- 4. ตาราง market_days (51 แถว: อดีต 45 วัน [เปิด 42, ปิดปรับปรุง 3] + อนาคต 6 วันสำหรับสาธิตการจอง)")
     sql.append("-- ========================================================================================")
     sql.append("SET IDENTITY_INSERT market_days ON;")
     while len(market_days) < 45:
@@ -146,6 +148,18 @@ def generate_market_data(output_path="data.sql"):
             market_days.append((mday_id, d_str, is_open))
             mday_id += 1
         cur_date += timedelta(days=1)
+
+    # วันตลาดในอนาคต (พ.ย.-ธ.ค. 2569) เปิดรับจองแต่ยังไม่มีสัญญา ไว้สาธิตตอนอัดวิดีโอ
+    # ไม่ใส่ลงลิสต์ market_days เพื่อไม่ให้ถูกนำไปสร้าง leases และไม่กระทบลำดับสุ่มของข้อมูลเดิม
+    future_market_dates = ['2026-11-06', '2026-11-07', '2026-11-08',
+                           '2026-12-04', '2026-12-05', '2026-12-06']
+    sql.append("-- วันตลาดในอนาคต (พ.ย.-ธ.ค. 2569) เปิดรับจองแต่ยังไม่มีสัญญา ไว้สาธิต sp_reserve_stall / sp_record_utility / sp_cancel_lease")
+    for d_str in future_market_dates:
+        sql.append(
+            f"INSERT INTO market_days (market_day_id, market_date, is_open) "
+            f"VALUES ({mday_id}, '{d_str}', 1);"
+        )
+        mday_id += 1
     sql.append("SET IDENTITY_INSERT market_days OFF;\nGO\n")
 
     # ----------------------------------------------------
@@ -445,7 +459,7 @@ def generate_market_data(output_path="data.sql"):
     print(f"- stall_zones: {len(zones)} แถว")
     print(f"- stalls: {len(stalls)} แถว")
     print(f"- merchants: {len(merchant_data)} แถว")
-    print(f"- market_days: {len(market_days)} แถว")
+    print(f"- market_days: {len(market_days) + len(future_market_dates)} แถว")
     print(f"- staff: {len(staff_list)} แถว")
     print(f"- leases: {len(lease_records)} แถว")
     print(f"- utility_charges: {charge_id - 1} แถว")

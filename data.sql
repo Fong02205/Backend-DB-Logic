@@ -1,3 +1,6 @@
+USE market_db;
+GO
+
 -- ========================================================================================
 -- ไฟล์: data.sql (ชุดข้อมูลจำลอง Mock Data สำหรับระบบการจองและเช่าพื้นที่ตลาดนัด - หัวข้อ 27)
 -- DBMS: Microsoft SQL Server (T-SQL) | อ้างอิงตาม Schema v0.1
@@ -128,7 +131,7 @@ SET IDENTITY_INSERT merchants OFF;
 GO
 
 -- ========================================================================================
--- 4. ตาราง market_days (45 แถว: เปิด 42 วัน, ปิดปรับปรุง 3 วัน)
+-- 4. ตาราง market_days (51 แถว: อดีต 45 วัน [เปิด 42, ปิดปรับปรุง 3] + อนาคต 6 วันสำหรับสาธิตการจอง)
 -- ========================================================================================
 SET IDENTITY_INSERT market_days ON;
 INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (1, '2026-07-03', 1);
@@ -176,6 +179,13 @@ INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (42, '2026-
 INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (43, '2026-10-09', 1);
 INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (44, '2026-10-10', 1);
 INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (45, '2026-10-11', 1);
+-- วันตลาดในอนาคต (พ.ย.-ธ.ค. 2569) เปิดรับจองแต่ยังไม่มีสัญญา ไว้สาธิต sp_reserve_stall / sp_record_utility / sp_cancel_lease
+INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (46, '2026-11-06', 1);
+INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (47, '2026-11-07', 1);
+INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (48, '2026-11-08', 1);
+INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (49, '2026-12-04', 1);
+INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (50, '2026-12-05', 1);
+INSERT INTO market_days (market_day_id, market_date, is_open) VALUES (51, '2026-12-06', 1);
 SET IDENTITY_INSERT market_days OFF;
 GO
 

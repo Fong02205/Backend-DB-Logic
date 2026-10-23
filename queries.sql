@@ -1,8 +1,11 @@
+USE market_db;
+GO
+
 -- ==========================================================================================
 -- ไฟล์: queries.sql (Complex Queries 10 ข้อ สำหรับระบบการจองและเช่าพื้นที่ตลาดนัด - หัวข้อ 27)
 -- DBMS: Microsoft SQL Server 2019 (T-SQL) | อ้างอิงตาม Schema v0.1
--- หมายเหตุ: ใน Schema v0.1 ไม่เก็บ utility_charges.charge_amount แล้ว (คำนวณตอนอ่าน)
---           จึงใช้ units_used * unit_rate แทนใน Query 02, 04, 05, 08
+-- หมายเหตุ: utility_charges.charge_amount เป็นคอลัมน์คำนวณ (Computed Column) อ่านได้แต่เขียนไม่ได้
+--           = CAST(units_used * unit_rate AS DECIMAL(18,2)) ตาม schema.sql จึงอ่าน charge_amount ตรง ๆ ใน Query 02, 04, 05, 08
 -- ==========================================================================================
 
 -- ==========================================================================================
@@ -34,7 +37,7 @@ GO
 -- Query 02: รายงานสรุปค่าใช้จ่ายสุทธิรายสัญญา (ค่าเช่า + ค่าน้ำไฟ + ค่าปรับ ไม่รวมมัดจำ)
 -- หมวดหมู่: Multi-table JOIN (รวมยอดค่าน้ำไฟและค่าปรับแยกเป็นรายสัญญาก่อน เพื่อป้องกันค่าเช่านับซ้ำ)
 -- การนำไปใช้ในระบบ: ใช้ในหน้าจอ "ใบสรุปยอดค่าใช้จ่ายประจำสัญญา" เพื่อเรียกเก็บเงินผู้ค้าเมื่อสิ้นสุดวันตลาด
--- [FIX] คำนวณค่าน้ำไฟจาก units_used * unit_rate (ไม่มีคอลัมน์ charge_amount ใน Schema v0.1)
+-- [FIX] ใช้ค่าน้ำไฟจาก charge_amount (คอลัมน์คำนวณ อ่านได้แต่เขียนไม่ได้)
 -- ==========================================================================================
 SELECT 
     l.lease_id,
@@ -50,7 +53,7 @@ JOIN merchants m ON l.merchant_id = m.merchant_id
 JOIN stalls s ON l.stall_id = s.stall_id
 JOIN market_days md ON l.market_day_id = md.market_day_id
 LEFT JOIN (
-    SELECT lease_id, CAST(SUM(units_used * unit_rate) AS DECIMAL(12, 2)) AS total_utility
+    SELECT lease_id, CAST(SUM(charge_amount) AS DECIMAL(12, 2)) AS total_utility
     FROM utility_charges
     GROUP BY lease_id
 ) u ON l.lease_id = u.lease_id
@@ -88,7 +91,7 @@ GO
 -- หมวดหมู่: GROUP BY + HAVING
 -- การนำไปใช้ในระบบ: ใช้ในหน้ารายงาน "วิเคราะห์การใช้พลังงานรายโซน" ของฝ่ายซ่อมบำรุงและดูแลสาธารณูปโภค
 -- (หมายเหตุ: ใช้เกณฑ์เริ่มต้นตาม B4 ข้อ 4 คือ > 100 หน่วย เมื่อรันกับ data.sql จะได้ 3 โซน (โซน 1, 2, 3) อยู่ในช่วง 3-10 แถว)
--- [FIX] คำนวณรายได้ค่าไฟจาก units_used * unit_rate
+-- [FIX] ใช้รายได้ค่าไฟจาก charge_amount (คอลัมน์คำนวณ อ่านได้แต่เขียนไม่ได้)
 --       (UNIQUE (lease_id, utility_type) ทำให้ 1 สัญญามีบิลไฟ 1 รายการ ค่าเฉลี่ยต่อบิล = ต่อสัญญา)
 -- ==========================================================================================
 SELECT 
@@ -96,7 +99,7 @@ SELECT
     z.zone_name,
     COUNT(u.charge_id) AS electricity_bill_count,
     AVG(u.units_used) AS avg_electricity_units,
-    CAST(SUM(u.units_used * u.unit_rate) AS DECIMAL(12, 2)) AS total_electricity_revenue
+    CAST(SUM(u.charge_amount) AS DECIMAL(12, 2)) AS total_electricity_revenue
 FROM stall_zones z
 JOIN stalls s ON z.zone_id = s.zone_id
 JOIN leases l ON s.stall_id = l.stall_id
@@ -115,7 +118,7 @@ GO
 -- หมวดหมู่: GROUP BY + HAVING (รวมยอดค่าน้ำไฟรายสัญญาก่อนเชื่อม เพื่อไม่ให้ค่าเช่าถูกนับซ้ำ)
 -- การนำไปใช้ในระบบ: ใช้ในหน้ารายงานผู้บริหาร "สรุปรอบวันตลาดที่ทำรายได้สูง (Peak Market Days)"
 -- (หมายเหตุ: ปรับเกณฑ์เป็น > 20000 บาท เมื่อรันกับ data.sql จะได้ผลลัพธ์ 6 แถว ตามเกณฑ์ 3-10 แถว)
--- [FIX] คำนวณค่าน้ำไฟจาก units_used * unit_rate
+-- [FIX] ใช้ค่าน้ำไฟจาก charge_amount (คอลัมน์คำนวณ อ่านได้แต่เขียนไม่ได้)
 -- ==========================================================================================
 SELECT 
     md.market_day_id,
@@ -127,7 +130,7 @@ SELECT
 FROM market_days md
 JOIN leases l ON md.market_day_id = l.market_day_id
 LEFT JOIN (
-    SELECT lease_id, CAST(SUM(units_used * unit_rate) AS DECIMAL(12, 2)) AS lease_utility_cost
+    SELECT lease_id, CAST(SUM(charge_amount) AS DECIMAL(12, 2)) AS lease_utility_cost
     FROM utility_charges
     GROUP BY lease_id
 ) u ON l.lease_id = u.lease_id
@@ -143,6 +146,7 @@ GO
 -- การนำไปใช้ในระบบ: ใช้ในหน้าจอ "วิเคราะห์แผงค้าว่างต่อเนื่อง" เพื่อจัดโปรโมชั่นลดราคาค่าเช่าดึงดูดผู้ค้า
 -- (หมายเหตุ: ใช้วันที่ปัจจุบันจาก SYSDATETIME() เมื่อรันกับ data.sql ตั้งแต่วันที่ 28 ก.ย. 2569 เป็นต้นไป
 --  จะได้ 5 แผงเสมอ คือ F09, B09, S09, C09 และ G09 (stall_id 9, 19, 29, 39, 49)
+--  วันตลาดในอนาคต (พ.ย.-ธ.ค. 2569) ไม่ถูกนับ เพราะกรอง market_date < วันนี้
 --  ถ้าต้องการให้ผลลัพธ์คงที่ ให้เปลี่ยน CAST(SYSDATETIME() AS DATE) เป็น '2026-10-01' ตามที่ B4 ข้อ 6 อนุญาต)
 -- ==========================================================================================
 SELECT 
@@ -203,7 +207,7 @@ GO
 -- Query 08: สัญญาเช่าที่มียอดค่าน้ำไฟรวมสูงกว่าค่าเฉลี่ยค่าน้ำไฟต่อสัญญาของโซนเดียวกัน
 -- หมวดหมู่: Correlated Subquery (เปรียบเทียบยอดค่าน้ำไฟกับค่าเฉลี่ยภายใน zone_id เดียวกัน)
 -- การนำไปใช้ในระบบ: ใช้ในหน้าจอ "แจ้งเตือนการใช้สาธารณูปโภคสูงผิดปกติ" เพื่อให้เจ้าหน้าที่ตรวจสอบมิเตอร์
--- [FIX] คำนวณค่าน้ำไฟจาก units_used * unit_rate
+-- [FIX] ใช้ค่าน้ำไฟจาก charge_amount (คอลัมน์คำนวณ อ่านได้แต่เขียนไม่ได้)
 -- ==========================================================================================
 WITH LeaseUtility AS (
     SELECT 
@@ -212,7 +216,7 @@ WITH LeaseUtility AS (
         s.stall_code,
         m.merchant_name,
         md.market_date,
-        CAST(SUM(u.units_used * u.unit_rate) AS DECIMAL(12, 2)) AS total_utility_cost
+        CAST(SUM(u.charge_amount) AS DECIMAL(12, 2)) AS total_utility_cost
     FROM leases l
     JOIN stalls s ON l.stall_id = s.stall_id
     JOIN merchants m ON l.merchant_id = m.merchant_id
